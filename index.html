@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Breach Protocol // darkOes</title>
+<meta name="description" content="A Cyberpunk-style breach protocol hacking minigame in the browser.">
+<meta name="theme-color" content="#05080c">
+<style>
+  :root{--bg:#05080c;--panel:#0b1118;--line:#1d2a36;--fg:#c9d1d9;--w:#e6edf3;--y:#FCEE0A;--c:#00F0FF;--r:#FF2A6D;--g:#39FF14;--m:#6b7a86}
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 'JetBrains Mono','Fira Code',Consolas,'Courier New',monospace}
+  body{min-height:100vh;background:radial-gradient(ellipse at 70% 0%,rgba(252,238,10,.07),transparent 60%),var(--bg)}
+  body::after{content:"";position:fixed;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(0,0,0,.25) 0 1px,transparent 1px 3px);z-index:50}
+  a{color:var(--c)}
+  header{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid var(--line);font-size:12px}
+  header a{text-decoration:none}
+  header .brand{color:var(--y);letter-spacing:2px}
+  main{max-width:1080px;margin:0 auto;padding:24px 16px 48px}
+  h1{margin:0;color:var(--y);font-size:clamp(26px,5vw,44px);letter-spacing:2px;text-shadow:0 0 14px rgba(252,238,10,.5)}
+  .sub{color:var(--c);letter-spacing:3px;font-size:12px;margin:4px 0 18px}
+  .bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:18px}
+  .timer{flex:1;min-width:220px;height:34px;border:1px solid var(--y);position:relative;background:#0a0d05}
+  .timer i{position:absolute;inset:0;background:var(--y);transform-origin:left;opacity:.85}
+  .timer>span{position:relative;display:flex;align-items:center;justify-content:space-between;height:100%;padding:0 10px;color:#fff;font-weight:700;mix-blend-mode:difference}
+  button,select{font:inherit;background:transparent;color:var(--y);border:1px solid var(--y);padding:7px 14px;cursor:pointer;letter-spacing:1px}
+  button:hover,select:hover{background:var(--y);color:#000}
+  select option{background:#000;color:var(--y)}
+  .grid{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:18px}
+  @media (max-width:820px){.grid{grid-template-columns:1fr}}
+  .panel{border:1px solid var(--line);background:var(--panel);position:relative}
+  .panel h2{margin:0;padding:8px 14px;font-size:13px;letter-spacing:2px;color:#000;background:var(--y)}
+  .panel.c h2{background:var(--c)}
+  .panel .body{padding:14px}
+  #matrix{display:grid;gap:4px;justify-content:center;padding:18px 10px;position:relative}
+  .cell{width:clamp(40px,9vw,58px);height:clamp(40px,9vw,58px);display:flex;align-items:center;justify-content:center;font-size:clamp(14px,2.6vw,19px);
+    color:var(--w);border:1px solid transparent;cursor:default;user-select:none;transition:background .1s,color .1s;position:relative}
+  .cell.active{background:rgba(252,238,10,.07);border-color:rgba(252,238,10,.18);cursor:pointer}
+  .cell.active:hover,.cell.active:focus{background:var(--y);color:#000;outline:none}
+  .cell.hint{background:rgba(0,240,255,.10)}
+  .cell.used{color:#2b3946;text-decoration:line-through}
+  .cell.used::after{content:"[ ]";position:absolute;font-size:10px;color:#2b3946;bottom:2px}
+  .cell.match{color:var(--c);text-shadow:0 0 8px var(--c)}
+  #buffer{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}
+  .slot{width:44px;height:36px;border:1px dashed var(--m);display:flex;align-items:center;justify-content:center;color:var(--w)}
+  .slot.filled{border:1px solid var(--y);color:var(--y)}
+  .daemon{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+  .daemon:last-child{border:0}
+  .daemon .codes{display:flex;gap:6px;flex-wrap:wrap}
+  .daemon .codes b{font-weight:400;padding:2px 6px;border:1px solid #2b3946;color:var(--w)}
+  .daemon .codes b.ok{border-color:var(--c);color:var(--c)}
+  .daemon .name{font-size:12px;color:var(--m);letter-spacing:1px;margin-top:4px}
+  .daemon .st{margin-left:auto;font-size:12px;letter-spacing:1px;white-space:nowrap}
+  .daemon.done .st{color:var(--g)} .daemon.fail .st{color:var(--r)}
+  .daemon.done .codes b{border-color:var(--g);color:var(--g)}
+  .daemon.fail{opacity:.5}
+  #overlay{position:absolute;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;gap:10px;background:rgba(5,8,12,.88);text-align:center;padding:16px;z-index:5}
+  #overlay.on{display:flex}
+  #overlay h3{margin:0;font-size:clamp(20px,4vw,30px);letter-spacing:3px}
+  #overlay.win h3{color:var(--g);text-shadow:0 0 12px var(--g)}
+  #overlay.lose h3{color:var(--r);text-shadow:0 0 12px var(--r)}
+  .rules{font-size:13px;color:var(--fg)}
+  .rules li{margin:4px 0}
+  .stats{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--m);margin-top:10px}
+  .stats b{color:var(--y);font-weight:400}
+  .glitch{animation:gl .35s steps(2) 2}
+  @keyframes gl{25%{transform:translate(-3px,1px);filter:hue-rotate(90deg)}50%{transform:translate(3px,-1px)}75%{transform:translate(-1px,0);filter:invert(.2)}}
+  footer{text-align:center;color:var(--m);font-size:12px;padding:20px}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <a class="brand" href="https://darkoes.github.io/">← darkOes.exe</a>
+  <a href="https://github.com/darkOes/breach-protocol">source code ↗</a>
+</header>
+<main>
+  <h1>BREACH_PROTOCOL</h1>
+  <div class="sub">// HACK THE ICE BEFORE THE TRACE COMPLETES</div>
+
+  <div class="bar">
+    <div class="timer idle" id="timer"><i id="timerFill"></i><span><span>BREACH TIME REMAINING</span><span id="timerText">—</span></span></div>
+    <select id="diff" aria-label="difficulty">
+      <option value="easy">EASY // 5x5</option>
+      <option value="normal" selected>NORMAL // 6x6</option>
+      <option value="hard">HARD // 7x7</option>
+    </select>
+    <button id="newBtn">NEW BREACH</button>
+  </div>
+
+  <div class="grid">
+    <section class="panel">
+      <h2>CODE MATRIX</h2>
+      <div id="matrix" role="grid" aria-label="code matrix"></div>
+      <div id="overlay"><h3 id="ovTitle"></h3><div id="ovText"></div><button id="againBtn">RUN AGAIN</button></div>
+    </section>
+    <div style="display:flex;flex-direction:column;gap:18px">
+      <section class="panel">
+        <h2>BUFFER</h2>
+        <div class="body"><div id="buffer"></div><div class="stats"><span>uploaded: <b id="sUp">0</b></span><span>breaches won: <b id="sWin">0</b></span><span>best: <b id="sBest">0</b>/3</span></div></div>
+      </section>
+      <section class="panel c">
+        <h2>SEQUENCE REQUIRED TO UPLOAD</h2>
+        <div class="body" id="daemons"></div>
+      </section>
+      <section class="panel">
+        <h2>HOW TO BREACH</h2>
+        <div class="body rules"><ol style="margin:0;padding-left:18px">
+          <li>Start by picking any code in the <b style="color:var(--y)">top row</b>.</li>
+          <li>Then alternate: pick from the <b style="color:var(--y)">column</b> of your last pick, then the <b style="color:var(--y)">row</b>, and so on.</li>
+          <li>Each pick goes into the buffer. Fill it with the daemon sequences (in order, back to back).</li>
+          <li>The trace timer starts on your first pick. Upload all 3 daemons for a full breach.</li>
+        </ol></div>
+      </section>
+    </div>
+  </div>
+</main>
+<footer>built by <a href="https://github.com/darkOes">darkOes</a> // vanilla JS, no libraries // never fade away 🌙</footer>
+
+<script>
+(() => {
+  const CODES = ['1C', '55', 'BD', 'E9', '7A', 'FF'];
+  const DIFF = {
+    easy:   {n: 5, buffer: 7, time: 45, lens: [2, 3, 3]},
+    normal: {n: 6, buffer: 8, time: 35, lens: [2, 3, 4]},
+    hard:   {n: 7, buffer: 8, time: 25, lens: [3, 4, 4]},
+  };
+  const NAMES = ['ICE_BREAKER', 'DATAMINE', 'NEURAL_PULSE'];
+  const $ = id => document.getElementById(id);
+  const rnd = n => Math.floor(crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32 * n);
+
+  let S, timerId;
+  const stats = JSON.parse(safeGet('bp-stats') || '{"up":0,"win":0,"best":0}');
+  function safeGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function safeSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+
+  // Build a random valid path through the matrix (alternating row/column), return its codes.
+  function randomPath(grid, len) {
+    const n = grid.length;
+    for (let attempt = 0; attempt < 200; attempt++) {
+      const used = new Set(); const path = [];
+      let row = 0, col = rnd(n), axis = 'row'; // first pick: any column in row 0
+      path.push([row, col]); used.add(row + ',' + col); axis = 'col';
+      let ok = true;
+      while (path.length < len) {
+        const opts = [];
+        for (let i = 0; i < n; i++) {
+          const r = axis === 'col' ? i : row, c = axis === 'col' ? col : i;
+          if (!used.has(r + ',' + c)) opts.push([r, c]);
+        }
+        if (!opts.length) { ok = false; break; }
+        [row, col] = opts[rnd(opts.length)];
+        path.push([row, col]); used.add(row + ',' + col);
+        axis = axis === 'col' ? 'row' : 'col';
+      }
+      if (ok) return path.map(([r, c]) => grid[r][c]);
+    }
+    return null;
+  }
+
+  function newGame() {
+    clearInterval(timerId);
+    const d = DIFF[$('diff').value];
+    const grid = Array.from({length: d.n}, () => Array.from({length: d.n}, () => CODES[rnd(CODES.length)]));
+    const path = randomPath(grid, d.buffer);
+    // Daemons are slices of one valid path, so a full breach is always possible.
+    const daemons = d.lens.map((len, i) => {
+      const start = rnd(d.buffer - len + 1);
+      return {name: NAMES[i], seq: path.slice(start, start + len), state: 'open'};
+    });
+    S = {d, grid, daemons, buffer: [], used: new Set(), axis: 'row', line: 0, started: false, over: false, left: d.time};
+    $('overlay').className = '';
+    renderTimer(); render();
+  }
+
+  function activeCells() {
+    const out = [];
+    if (S.over || S.buffer.length >= S.d.buffer) return out;
+    for (let i = 0; i < S.d.n; i++) {
+      const r = S.axis === 'row' ? S.line : i, c = S.axis === 'row' ? i : S.line;
+      if (!S.used.has(r + ',' + c)) out.push(r + ',' + c);
+    }
+    return out;
+  }
+
+  function render() {
+    const m = $('matrix');
+    m.style.gridTemplateColumns = `repeat(${S.d.n}, auto)`;
+    const act = new Set(activeCells());
+    m.innerHTML = '';
+    S.grid.forEach((row, r) => row.forEach((code, c) => {
+      const el = document.createElement('div');
+      const key = r + ',' + c;
+      el.className = 'cell' + (S.used.has(key) ? ' used' : '') + (act.has(key) ? ' active' : '');
+      el.textContent = code;
+      el.setAttribute('role', 'gridcell');
+      if (act.has(key)) {
+        el.tabIndex = 0;
+        el.onclick = () => pick(r, c);
+        el.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(r, c); } };
+        el.onmouseenter = () => hint(r, c);
+        el.onmouseleave = () => hint(-1, -1);
+      }
+      m.appendChild(el);
+    }));
+    // buffer
+    const b = $('buffer'); b.innerHTML = '';
+    for (let i = 0; i < S.d.buffer; i++) {
+      const s = document.createElement('div');
+      s.className = 'slot' + (S.buffer[i] ? ' filled' : '');
+      s.textContent = S.buffer[i] || '';
+      b.appendChild(s);
+    }
+    // daemons
+    const dv = $('daemons'); dv.innerHTML = '';
+    S.daemons.forEach(dm => {
+      const prog = dm.state === 'open' ? progress(dm.seq) : 0;
+      const el = document.createElement('div');
+      el.className = 'daemon ' + (dm.state === 'done' ? 'done' : dm.state === 'fail' ? 'fail' : '');
+      el.innerHTML = `<div><div class="codes">${dm.seq.map((x, i) => `<b class="${i < prog ? 'ok' : ''}">${x}</b>`).join('')}</div><div class="name">${dm.name}</div></div>
+        <div class="st">${dm.state === 'done' ? 'UPLOADED' : dm.state === 'fail' ? 'FAILED' : ''}</div>`;
+      dv.appendChild(el);
+    });
+    $('sUp').textContent = stats.up; $('sWin').textContent = stats.win; $('sBest').textContent = stats.best;
+  }
+
+  // how many leading codes of seq already sit at the end of the buffer
+  function progress(seq) {
+    for (let k = Math.min(seq.length - 1, S.buffer.length); k > 0; k--) {
+      if (S.buffer.slice(-k).join() === seq.slice(0, k).join()) return k;
+    }
+    return 0;
+  }
+
+  function hint(r, c) {
+    document.querySelectorAll('.cell.hint').forEach(e => e.classList.remove('hint'));
+    if (r < 0) return;
+    const cells = document.querySelectorAll('.cell');
+    for (let i = 0; i < S.d.n; i++) {
+      const rr = S.axis === 'row' ? i : r, cc = S.axis === 'row' ? c : i;
+      cells[rr * S.d.n + cc].classList.add('hint');
+    }
+  }
+
+  function pick(r, c) {
+    if (S.over) return;
+    if (!S.started) startTimer();
+    S.used.add(r + ',' + c);
+    S.buffer.push(S.grid[r][c]);
+    if (S.axis === 'row') { S.axis = 'col'; S.line = c; } else { S.axis = 'row'; S.line = r; }
+    const joined = ',' + S.buffer.join(',') + ',';
+    const remaining = S.d.buffer - S.buffer.length;
+    S.daemons.forEach(dm => {
+      if (dm.state !== 'open') return;
+      if (joined.includes(',' + dm.seq.join(',') + ',')) { dm.state = 'done'; stats.up++; blink(); }
+      else if (dm.seq.length - progress(dm.seq) > remaining) dm.state = 'fail';
+    });
+    const open = S.daemons.filter(x => x.state === 'open').length;
+    if (!open || remaining === 0 || !activeCells().length) end();
+    render();
+  }
+
+  function blink() { const m = $('matrix'); m.classList.remove('glitch'); void m.offsetWidth; m.classList.add('glitch'); }
+
+  function startTimer() {
+    S.started = true; $('timer').classList.remove('idle');
+    const t0 = performance.now();
+    timerId = setInterval(() => {
+      S.left = Math.max(0, S.d.time - (performance.now() - t0) / 1000);
+      renderTimer();
+      if (S.left <= 0) { S.daemons.forEach(dm => { if (dm.state === 'open') dm.state = 'fail'; }); end(true); render(); }
+    }, 50);
+  }
+  function renderTimer() {
+    $('timerFill').style.transform = `scaleX(${S.left / S.d.time})`;
+    $('timerText').textContent = S.started ? S.left.toFixed(2) : S.d.time.toFixed(2);
+    if (!S.started) $('timer').classList.add('idle');
+  }
+
+  function end(timeout) {
+    if (S.over) return;
+    S.over = true; clearInterval(timerId);
+    S.daemons.forEach(dm => { if (dm.state === 'open') dm.state = 'fail'; });
+    const done = S.daemons.filter(x => x.state === 'done').length;
+    stats.best = Math.max(stats.best, done);
+    if (done === 3) stats.win++;
+    safeSet('bp-stats', JSON.stringify(stats));
+    const ov = $('overlay');
+    ov.className = 'on ' + (done ? 'win' : 'lose');
+    $('ovTitle').textContent = done === 3 ? 'FULL BREACH' : done ? 'PARTIAL BREACH' : (timeout ? 'TRACE COMPLETE' : 'BREACH FAILED');
+    $('ovText').textContent = `${done}/3 daemons uploaded` + (timeout ? ' // netwatch found you' : '');
+  }
+
+  $('newBtn').onclick = newGame; $('againBtn').onclick = newGame; $('diff').onchange = newGame;
+  newGame();
+})();
+</script>
+</body>
+</html>
